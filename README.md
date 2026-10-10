@@ -1,12 +1,12 @@
 # Ad Click Prediction using Logistic Regression
 
-## 📌 Project Overview
+## Project Overview
 
 The **Ad Click Prediction** project uses Machine Learning to predict whether a user will click on an advertisement based on features such as age, gender, device type, ad position, browsing history, and time of day.
 
 This project uses **Logistic Regression** with a complete Scikit-learn Pipeline for data preprocessing, model training, prediction, and evaluation.
 
-## 🎯 Objectives
+## Objectives
 
 - Predict whether a user will click an advertisement.
 - Handle missing values using imputation techniques.
@@ -16,7 +16,7 @@ This project uses **Logistic Regression** with a complete Scikit-learn Pipeline 
 - Visualize ad click patterns using graphs.
 - Save and reload the trained Machine Learning model.
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 Ad-Click-Prediction/
@@ -37,7 +37,7 @@ Ad-Click-Prediction/
 
 *Note: The PNG images, prediction CSV, and model file are generated when the program runs successfully.*
 
-## 📊 Dataset Information
+## Dataset Information
 
 The dataset contains information about users and their interactions with advertisements.
 
@@ -55,7 +55,7 @@ The dataset contains information about users and their interactions with adverti
 
 The `id` and `full_name` columns are removed before model training. The `click` column is the target variable.
 
-## 🛠️ Technologies Used
+## Technologies Used
 
 - Python
 - Pandas
@@ -66,7 +66,7 @@ The `id` and `full_name` columns are removed before model training. The `click` 
 - Logistic Regression
 - Machine Learning Pipeline
 
-## ⚙️ Machine Learning Workflow
+## Machine Learning Workflow
 
 1. Load the dataset.
 2. Inspect missing values and dataset statistics.
@@ -84,7 +84,7 @@ The `id` and `full_name` columns are removed before model training. The `click` 
 14. Perform cross-validation.
 15. Save and reload the trained model.
 
-## 📈 Visualizations
+## Visualizations
 
 ### 1. Ad Click Distribution
 
@@ -110,7 +110,7 @@ Evaluates the model's ability to distinguish between the two target classes usin
 
 File: `roc_curve.png`
 
-## 📏 Model Evaluation
+## Model Evaluation
 
 The model is evaluated using the following metrics:
 
@@ -124,7 +124,7 @@ The model is evaluated using the following metrics:
 
 Actual metric values are displayed when the program runs; they depend on the dataset and train-test split.
 
-## 🚀 Installation and Execution
+## Installation and Execution
 
 ### Step 1: Clone the Repository
 
@@ -156,7 +156,7 @@ python AdClickPrediction.py
 
 Keep `ad_click_dataset.csv` in the same folder as the Python script unless you change the dataset path in the code.
 
-## 💾 Generated Outputs
+## Generated Outputs
 
 After successful execution, the project generates:
 
@@ -169,7 +169,7 @@ After successful execution, the project generates:
 
 The saved model can be loaded later using Joblib for further predictions.
 
-## 🔮 Future Improvements
+## Future Improvements
 
 - Compare Logistic Regression with Random Forest and other classification algorithms.
 - Tune hyperparameters to improve performance.
@@ -177,6 +177,6 @@ The saved model can be loaded later using Joblib for further predictions.
 - Perform feature importance and coefficient analysis.
 - Monitor model performance on new advertisement data.
 
-## ⚠️ Limitations
+## Limitations
 
 The model identifies patterns in the available dataset and does not establish why a user clicks an advertisement. Model performance depends on data quality, feature quality, and class distribution.
