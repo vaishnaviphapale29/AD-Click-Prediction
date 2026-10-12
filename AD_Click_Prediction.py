@@ -5,12 +5,14 @@ import joblib
 
 from pathlib import Path
 
+from sklearn.base import clone
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 
 from sklearn.metrics import (
     accuracy_score,
@@ -98,6 +100,9 @@ def AdClickPredict(DataPath):
 
     print("\nClick Class Distribution:")
     print(df["click"].value_counts())
+
+    print("\nClick Class Percentage:")
+    print((df["click"].value_counts(normalize=True) * 100).round(2))
 
     #--------------------------------------------------
     # Step 4 : Click Distribution Visualization
@@ -226,10 +231,10 @@ def AdClickPredict(DataPath):
     print("Testing Records:", X_test.shape[0])
 
     #--------------------------------------------------
-    # Step 7 : Create ML Pipeline
+    # Step 7 : Create Preprocessing Pipeline
     #--------------------------------------------------
     print("\n" + Border)
-    print("Step 7 : Create ML Pipeline")
+    print("Step 7 : Create Preprocessing Pipeline")
     print(Border)
 
     NumericPipeline = Pipeline([
@@ -247,30 +252,132 @@ def AdClickPredict(DataPath):
         ("categorical", CategoricalPipeline, CategoricalColumns)
     ])
 
-    ModelPipeline = Pipeline([
-        ("preprocessor", Preprocessor),
-        ("model", LogisticRegression(max_iter=1000))
-    ])
-
-    print("ML Pipeline created successfully.")
+    print("Preprocessing pipeline created successfully.")
 
     #--------------------------------------------------
-    # Step 8 : Train Model
+    # Step 8 : Create Machine Learning Models
     #--------------------------------------------------
     print("\n" + Border)
-    print("Step 8 : Train Logistic Regression Model")
+    print("Step 8 : Create Machine Learning Models")
     print(Border)
 
-    ModelPipeline.fit(X_train, Y_train)
+    # class_weight="balanced" stops the model from always predicting
+    # the majority class (click = 1)
+    Models = {
+        "Logistic Regression": LogisticRegression(
+            max_iter=1000
+        ),
+        "Logistic Regression (Balanced)": LogisticRegression(
+            max_iter=1000,
+            class_weight="balanced"
+        ),
+        "Random Forest (Balanced)": RandomForestClassifier(
+            n_estimators=200,
+            max_depth=8,
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1
+        )
+    }
 
-    print("Model trained successfully.")
+    for ModelName in Models:
+        print("-", ModelName)
 
     #--------------------------------------------------
-    # Step 9 : Make Predictions
+    # Step 9 : Train and Compare Models
     #--------------------------------------------------
     print("\n" + Border)
-    print("Step 9 : Make Predictions")
+    print("Step 9 : Train and Compare Models")
     print(Border)
+
+    MinimumClassCount = int(
+        Y_train.value_counts().min()
+    )
+
+    CV = min(5, MinimumClassCount)
+
+    FittedModels = {}
+    ComparisonRows = []
+
+    for ModelName, Model in Models.items():
+
+        print("Training:", ModelName)
+
+        Pipe = Pipeline([
+            ("preprocessor", clone(Preprocessor)),
+            ("model", Model)
+        ])
+
+        Pipe.fit(X_train, Y_train)
+
+        Pred = Pipe.predict(X_test)
+
+        if CV >= 2:
+            CV_AUC = cross_val_score(
+                Pipe,
+                X_train,
+                Y_train,
+                cv=CV,
+                scoring="roc_auc"
+            ).mean()
+        else:
+            CV_AUC = float("nan")
+
+        TestAUC = None
+
+        if len(Pipe.classes_) == 2:
+            Probability = Pipe.predict_proba(X_test)[:, 1]
+            FPR_, TPR_, _ = roc_curve(
+                (Y_test == Pipe.classes_[1]).astype(int),
+                Probability
+            )
+            TestAUC = auc(FPR_, TPR_)
+
+        ComparisonRows.append({
+            "Model": ModelName,
+            "Accuracy": accuracy_score(Y_test, Pred),
+            "Macro_F1": f1_score(
+                Y_test, Pred,
+                average="macro",
+                zero_division=0
+            ),
+            "Recall_Class_0": recall_score(
+                Y_test, Pred,
+                labels=[Pipe.classes_[0]],
+                average="macro",
+                zero_division=0
+            ),
+            "Test_ROC_AUC": TestAUC,
+            "CV_ROC_AUC": CV_AUC
+        })
+
+        FittedModels[ModelName] = Pipe
+
+    ComparisonTable = pd.DataFrame(ComparisonRows).round(4)
+
+    print("\nModel Comparison:")
+    print(ComparisonTable.to_string(index=False))
+
+    #--------------------------------------------------
+    # Step 10 : Select Best Model and Predict
+    #--------------------------------------------------
+    print("\n" + Border)
+    print("Step 10 : Select Best Model and Make Predictions")
+    print(Border)
+
+    SortColumn = "Test_ROC_AUC"
+
+    if ComparisonTable[SortColumn].isnull().all():
+        SortColumn = "Macro_F1"
+
+    BestModelName = ComparisonTable.sort_values(
+        SortColumn,
+        ascending=False
+    ).iloc[0]["Model"]
+
+    ModelPipeline = FittedModels[BestModelName]
+
+    print("Best Model (by", SortColumn + "):", BestModelName)
 
     Y_pred = ModelPipeline.predict(X_test)
 
@@ -287,10 +394,10 @@ def AdClickPredict(DataPath):
     )
 
     #--------------------------------------------------
-    # Step 10 : Model Evaluation
+    # Step 11 : Model Evaluation
     #--------------------------------------------------
     print("\n" + Border)
-    print("Step 10 : Model Evaluation")
+    print("Step 11 : Model Evaluation")
     print(Border)
 
     Accuracy = accuracy_score(Y_test, Y_pred)
@@ -316,10 +423,18 @@ def AdClickPredict(DataPath):
         zero_division=0
     )
 
+    MacroF1 = f1_score(
+        Y_test,
+        Y_pred,
+        average="macro",
+        zero_division=0
+    )
+
     print("Accuracy :", round(Accuracy, 4))
     print("Precision:", round(Precision, 4))
     print("Recall   :", round(Recall, 4))
     print("F1 Score :", round(F1, 4))
+    print("Macro F1 :", round(MacroF1, 4))
 
     print("\nClassification Report:")
     print(classification_report(
@@ -329,10 +444,10 @@ def AdClickPredict(DataPath):
     ))
 
     #--------------------------------------------------
-    # Step 11 : Confusion Matrix
+    # Step 12 : Confusion Matrix
     #--------------------------------------------------
     print("\n" + Border)
-    print("Step 11 : Confusion Matrix")
+    print("Step 12 : Confusion Matrix")
     print(Border)
 
     CM = confusion_matrix(
@@ -366,10 +481,10 @@ def AdClickPredict(DataPath):
     plt.close()
 
     #--------------------------------------------------
-    # Step 12 : ROC Curve
+    # Step 13 : ROC Curve
     #--------------------------------------------------
     print("\n" + Border)
-    print("Step 12 : ROC Curve")
+    print("Step 13 : ROC Curve")
     print(Border)
 
     Classes = ModelPipeline.classes_
@@ -429,35 +544,6 @@ def AdClickPredict(DataPath):
         print("ROC curve skipped: target has more than two classes.")
 
     #--------------------------------------------------
-    # Step 13 : Cross Validation
-    #--------------------------------------------------
-    print("\n" + Border)
-    print("Step 13 : Cross Validation")
-    print(Border)
-
-    MinimumClassCount = int(
-        Y_train.value_counts().min()
-    )
-
-    CV = min(5, MinimumClassCount)
-
-    if CV >= 2:
-
-        CV_Scores = cross_val_score(
-            ModelPipeline,
-            X_train,
-            Y_train,
-            cv=CV,
-            scoring="accuracy"
-        )
-
-        print("Cross Validation Scores:", CV_Scores)
-        print("Mean CV Accuracy:", round(CV_Scores.mean(), 4))
-
-    else:
-        print("Cross-validation skipped: insufficient records.")
-
-    #--------------------------------------------------
     # Step 14 : Save Model
     #--------------------------------------------------
     print("\n" + Border)
@@ -474,22 +560,15 @@ def AdClickPredict(DataPath):
     print("Model saved successfully at:", ModelPath)
 
     #--------------------------------------------------
-    # Step 15 : Load Saved Model
+    # Step 15 : Load and Test Saved Model
     #--------------------------------------------------
     print("\n" + Border)
-    print("Step 15 : Load Saved Model")
+    print("Step 15 : Load and Test Saved Model")
     print(Border)
 
     LoadedModel = joblib.load(ModelPath)
 
     print("Saved model loaded successfully!")
-
-    #--------------------------------------------------
-    # Step 16 : Test Loaded Model
-    #--------------------------------------------------
-    print("\n" + Border)
-    print("Step 16 : Test Loaded Model")
-    print(Border)
 
     LoadedPredictions = LoadedModel.predict(X_test)
 
@@ -507,18 +586,19 @@ def AdClickPredict(DataPath):
     print("Loaded Model Accuracy:", round(LoadedAccuracy, 4))
 
     #--------------------------------------------------
-    # Step 17 : Final Summary
+    # Step 16 : Final Summary
     #--------------------------------------------------
     print("\n" + Border)
-    print("Step 17 : Final Summary")
+    print("Step 16 : Final Summary")
     print(Border)
 
     print("Dataset Records:", df.shape[0])
     print("Total Features:", X.shape[1])
     print("Training Records:", X_train.shape[0])
     print("Testing Records:", X_test.shape[0])
-    print("Model: Logistic Regression")
+    print("Best Model:", BestModelName)
     print("Accuracy:", round(Accuracy, 4))
+    print("Macro F1:", round(MacroF1, 4))
 
     print("\nGenerated Files:")
     print("1. class_distribution.png")
